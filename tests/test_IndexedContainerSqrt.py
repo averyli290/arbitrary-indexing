@@ -1,5 +1,6 @@
 import pytest
 import logging
+import random
 
 from arbitrary_indexing.IndexedContainerSqrt import IndexedContainerSqrt
 
@@ -75,6 +76,52 @@ def test_insert_success():
         for i in range(len(obj_array)):
             # logger.debug(i)
             assert(ics.access(obj_array[i]) == value_array[i])
+
+def test_insert_fail():
+    obj_array = [(i,i) for i in range(5)]
+    value_array = [i for i in range(5)]
+    ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array, hash_func=hash)
+
+    # This tuple has value already exist, should not append properly
+    with pytest.raises(AssertionError):
+        prev_obj = obj_array[0]
+        dummy_value = 0
+        idx = 0
+        ics.insert(idx=idx, obj=prev_obj, value=dummy_value)
+
+def test_random_inserts():
+    # Create ICS
+    sample_len = 10000
+    obj_array = [(i,i) for i in range(sample_len)]
+    value_array = [i for i in range(sample_len)]
+    ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array, hash_func=hash)
+
+    # Insert elements randomly
+    to_insert = 1000
+    for i in range(to_insert):
+        # Get random insert idx
+        insert_idx = random.randint(0, sample_len + i)
+        random_int = random.randint(-1000000,1000000)
+        obj = (random_int, random_int)
+        # obj = (i + sample_len, i + sample_len)
+        value = i
+        ics.insert(idx=insert_idx, obj=obj, value=value)
+
+        obj_array.insert(insert_idx, obj)
+        value_array.insert(insert_idx, value)
+
+    # Verify still correct
+    for i in range(len(obj_array)):
+        # logger.debug(i)
+        assert(ics.access(obj_array[i]) == value_array[i])
+    
+    # Reinitialize
+    ics.reinitialize_container()
+
+    # Verify still correct after reinitialization
+    for i in range(len(obj_array)):
+        # logger.debug(i)
+        assert(ics.access(obj_array[i]) == value_array[i])
 
 def test_reinitialization():
     # Create ICS

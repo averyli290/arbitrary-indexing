@@ -43,6 +43,16 @@ class IndexedContainerSqrt(IndexedContainer):
     '''
     def __init__(self, obj_array=None, value_array=None, hash_func=hash):
 
+        self.length = 0
+        self.sqrtval = 0
+
+        '''
+        TODO:
+        Work on figuring on what gives the best reinitialization_ratio or if
+        there is a better heuristic for when to reinitialize. (repeated in comment below)
+        '''
+        self.reinitialize_ratio = 10
+
         self.hash_func = hash_func
         self.hash_to_repr_hash = {}                     # Maps from hash value of object->representative hash value of object of region containing both objects
         self.repr_hash_to_region_start_idx = {}         # Maps from representative hash value->the index of the start of the region which contains it
@@ -82,6 +92,7 @@ class IndexedContainerSqrt(IndexedContainer):
 
         # Get length of each region
         region_length = max(1, int(self.length ** (1/2)))
+        self.sqrtval = region_length
 
 
         # Construct array containing values
@@ -92,6 +103,7 @@ class IndexedContainerSqrt(IndexedContainer):
             if hash_value in self.hash_to_repr_hash:
                 # Clear and reset class variables for memory
                 self.length = 0
+                self.sqrtval = 0
                 self.num_regions = 0
                 self.regions.clear()
                 self.region_size.clear()
@@ -132,17 +144,21 @@ class IndexedContainerSqrt(IndexedContainer):
         # Set object array to be the raw hash values to preserve mapping when reinitializing
         self.hash_func = lambda x: x
         obj_array = [0] * self.length
+        obj_array_set = set()
         value_array = [None] * self.length
 
         idx = 0
         for i in range(self.num_regions):
             for j in range(self.region_size[i]):
                 obj_array[idx] = self.regions_hash_values[i][j]
+                assert(obj_array[idx] not in obj_array_set)
+                obj_array_set.add(obj_array[idx])
                 value_array[idx] = self.regions[i][j]
                 idx += 1
         
         # Reset variables, arrays, and dicitonaries before initialization to avoid hashing errors
         self.length = 0
+        self.sqrtval = 0
         self.num_regions = 0
         self.regions.clear()
         self.region_size.clear()
@@ -209,6 +225,17 @@ class IndexedContainerSqrt(IndexedContainer):
         self.regions[-1].append(value)                      # Add value to last region
         self.regions_hash_values[-1].append(hash_value)     # Add hash value to index->hash value mapping by region
 
+        '''
+        Check if integrity has degraded, reinitialize if so.
+        Without reinitializing, appending 100000 elements can take up to 180 seconds,
+        with reinializing it can take as low at 4-5 (for a ratio of 10 on 10000 intial elements)
+        The ratio can clearly be fine tuned, perhaps it should be a function of the length, or
+        when the median/average of the region sizes are too imbalanced.
+        TODO: Work on figuring on what gives the best reinitialization_ratio or if there is a better heuristic for when to reinitialize.
+        '''
+        if self.region_size[-1] > self.reinitialize_ratio * self.sqrtval:
+            self.reinitialize_container()
+
     def insert(self, idx, obj, value):
         '''
         Docstring for insert
@@ -234,11 +261,6 @@ class IndexedContainerSqrt(IndexedContainer):
         region_idx = 0
         while region_idx < self.num_regions:
             # Get if index to insert at is contained in current region
-            # TODO: remove this next part? representatives are not necessarily the front anymore in this implementation.
-            # Note that we do not insert at the first element of a region
-            # to preserve the representative element being the first element (as a convention)
-            # This is not necessarily needed, but makes it easier to keep track of the representative
-            # object/hash of a region.
             region_start_idx = self.repr_hash_to_region_start_idx[self.hash_to_repr_hash[self.regions_hash_values[region_idx][0]]]
             if region_start_idx <= idx and idx < region_start_idx + self.region_size[region_idx]:
                 # If contained, insert at the current region
@@ -255,12 +277,22 @@ class IndexedContainerSqrt(IndexedContainer):
                 break
 
             region_idx += 1
+
+        target_region_idx = region_idx      # used to check integrity later
+        if target_region_idx >= self.num_regions:
+            raise IndexError(f"Could not insert value {value} at index {idx} represented by object {obj}.")
         
-        # For all regions after update the startig index to be += 1
+        # For all regions after the one inserted into, update the starting index to be += 1
+        region_idx += 1         # Shift to the region after inserted to region
         while region_idx < self.num_regions:
             repr_hash = self.hash_to_repr_hash[self.regions_hash_values[region_idx][0]]
             self.repr_hash_to_region_start_idx[repr_hash] += 1
             region_idx += 1
+
+        # Check if integrity has degraded, reinitialize if so
+        if self.region_size[target_region_idx] > self.reinitialize_ratio * self.sqrtval:
+            self.reinitialize_container()
+
     
     def _check_duplicate_hash(self, obj):
         '''
@@ -269,8 +301,10 @@ class IndexedContainerSqrt(IndexedContainer):
         :param obj: Object to check duplicate hash in self.hash_to_idx
         '''
 
+        # logger.debug(obj)
         hash_val = self.hash_func(obj)
+        # logger.debug(hash_val)
         if hash_val in self.hash_to_repr_hash:
-            raise AssertionError(f"The hash value of {obj} has already been assigned an index.")
+            raise AssertionError(f"The hash value {hash_val} of object {obj} has already been assigned a mapping.")
         
         return hash_val
