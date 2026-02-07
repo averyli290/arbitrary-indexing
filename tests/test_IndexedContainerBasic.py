@@ -8,19 +8,19 @@ def test_init_empty():
 def test_init_tuples():
     obj_array = [(i,i) for i in range(5)]
     value_array = [i for i in range(5)]
-    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array, hash_func=hash)
+    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array)
 
 def test_access_success():
     obj_array = [(i,i) for i in range(5)]
     value_array = [i for i in range(5)]
-    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array, hash_func=hash)
+    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array)
     for i in range(5):
         assert(icb.access(obj_array[i]) == i)
 
 def test_access_fail():
     obj_array = [(i,i) for i in range(5)]
     value_array = [i for i in range(5)]
-    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array, hash_func=hash)
+    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array)
 
     # This tuple doesn't exist, should not access properly
     with pytest.raises(AssertionError):
@@ -29,7 +29,7 @@ def test_access_fail():
 def test_append_success():
     obj_array = [(i,i) for i in range(5)]
     value_array = [i for i in range(5)]
-    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array, hash_func=hash)
+    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array)
     new_obj = (1,2)
     new_val = 3
     icb.append(obj=new_obj, value=new_val)
@@ -40,7 +40,7 @@ def test_append_success():
 def test_append_fail():
     obj_array = [(i,i) for i in range(5)]
     value_array = [i for i in range(5)]
-    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array, hash_func=hash)
+    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array)
 
     # This tuple has value already exist, should not append properly
     with pytest.raises(AssertionError):
@@ -51,7 +51,7 @@ def test_append_fail():
 def test_insert_fail():
     obj_array = [(i,i) for i in range(5)]
     value_array = [i for i in range(5)]
-    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array, hash_func=hash)
+    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array)
 
     # Insert is not implemented for IndexedContainerBasic, should return NotImplementedError
     with pytest.raises(NotImplementedError):
