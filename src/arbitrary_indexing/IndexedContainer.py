@@ -9,10 +9,9 @@ This implementation does not support removing elements or inserting into the mid
 
 
 class IndexedContainer:
-    def __init__(self, obj_array=None, value_array=None, hash_func=hash):
+    def __init__(self, obj_array=None, value_array=None):
         self.value_array = []
         self.length = 0
-        self.hash_func = hash_func
 
         self._initialize_container(obj_array=obj_array, value_array=value_array)
 

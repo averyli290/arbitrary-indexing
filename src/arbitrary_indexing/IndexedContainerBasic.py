@@ -11,14 +11,13 @@ from .IndexedContainer import IndexedContainer
 
 
 class IndexedContainerBasic(IndexedContainer):
-    def __init__(self, obj_array=None, value_array=None, hash_func=hash):
+    def __init__(self, obj_array=None, value_array=None):
 
-        self.hash_to_idx = {}
+        self.obj_to_idx = {}
 
         super().__init__(
             obj_array=obj_array,
             value_array=value_array,
-            hash_func=hash_func
         )
 
 
@@ -42,9 +41,9 @@ class IndexedContainerBasic(IndexedContainer):
         # Initialize length
         self.length = len(obj_array)
 
-        # Hash each object i and assign object to have index i
+        # Assign each object i to have index i
         for i in range(self.length):
-            self.hash_to_idx[self.hash_func(obj_array[i])] = i
+            self.obj_to_idx[obj_array[i]] = i
         
         # Assign value_array
         self.value_array = value_array
@@ -59,12 +58,11 @@ class IndexedContainerBasic(IndexedContainer):
         '''
 
         # Get if obj has a corresponding index
-        hash_value = self.hash_func(obj)
-        if hash_value not in self.hash_to_idx:
+        if obj not in self.obj_to_idx:
             raise AssertionError(f"Could not find an index corresponding to object {obj}.")
 
         # Get index corresponding to obj, check if it is within bounds
-        idx = self.hash_to_idx[hash_value]
+        idx = self.obj_to_idx[obj]
         if idx < 0 or idx >= self.length:
             raise AssertionError(f"Attemped to access index {idx} of a collection of size {self.length}.")
 
@@ -79,12 +77,11 @@ class IndexedContainerBasic(IndexedContainer):
         :param value: Value to append to array
         '''
         
-        # Check for no duplicate hash
-        hash_val = self.hash_func(obj)
-        if hash_val in self.hash_to_idx:
-            raise AssertionError(f"The hash value of {obj} has already been assigned an index. The append operation has failed.")
+        # Check for no duplicate object
+        if obj in self.obj_to_idx:
+            raise AssertionError(f"The object {obj} has already been assigned an index. The append operation has failed.")
         
-        self.hash_to_idx[hash_val] = self.length
+        self.obj_to_idx[obj] = self.length
         self.length += 1
         self.value_array.append(value)
 
