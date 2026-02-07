@@ -55,23 +55,53 @@ def test_append_fail():
         ics.append(obj=prev_obj, value=dummy_value)
 
 def test_insert_success():
-    obj_array = [(i,i) for i in range(5)]
-    value_array = [i for i in range(5)]
+    sample_len = 10
+    for insert_idx in range(sample_len):
+        obj_array = [(i,i) for i in range(sample_len)]
+        value_array = [i for i in range(sample_len)]
+        ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array, hash_func=hash)
+
+        # Insert new element at insert_idx
+        obj = (sample_len + 10, sample_len + 10)
+        value = -1
+        ics.insert(idx=insert_idx, obj=obj, value=value)
+
+        # Update obj_arrary and value_array for testing
+        obj_array.insert(insert_idx, obj)
+        value_array.insert(insert_idx, value)
+        # logger.debug(obj_array)
+        # logger.debug(value_array)
+
+        for i in range(len(obj_array)):
+            # logger.debug(i)
+            assert(ics.access(obj_array[i]) == value_array[i])
+
+def test_reinitialization():
+    # Create ICS
+    sample_len = 10000
+    obj_array = [(i,i) for i in range(sample_len)]
+    value_array = [i for i in range(sample_len)]
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array, hash_func=hash)
 
-    # Insert new element at index 0
-    idx = 0
-    obj = (10,10)
-    value = -1
-    ics.insert(idx=idx, obj=obj, value=value)
+    # Append elements (will be inefficient now)
+    to_append = 100000
+    for i in range(to_append):
+        obj = (i + sample_len, i + sample_len)
+        value = i
+        ics.append(obj=obj, value=value)
 
-    # Update obj_arrary and value_array for testing
-    obj_array.insert(0, obj)
-    value_array.insert(0, value)
-    logger.debug(obj_array)
-    logger.debug(value_array)
+        obj_array.append(obj)
+        value_array.append(value)
 
+    # Verify still correct
     for i in range(len(obj_array)):
-        logger.debug(i)
+        # logger.debug(i)
         assert(ics.access(obj_array[i]) == value_array[i])
+    
+    # Reinitialize
+    ics.reinitialize_container()
 
+    # Verify still correct after reinitialization
+    for i in range(len(obj_array)):
+        # logger.debug(i)
+        assert(ics.access(obj_array[i]) == value_array[i])

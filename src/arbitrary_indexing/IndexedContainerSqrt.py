@@ -14,6 +14,12 @@ Whenever inserting an index
 when any single region gets too big, recalculate
 
 maintain a list of lists: sqrt(n) lists of size sqrt(n)
+
+recalculating the array:
+    - This can take up to O(n) time
+    - we can also consider merging existing regions in place, possibly reducing the time
+        - is there a size where if we merge existing regions, it will take possible O(sqrt(n)) time?
+          to recalculate the regions
 '''
 
 import logging
@@ -38,15 +44,13 @@ class IndexedContainerSqrt(IndexedContainer):
     def __init__(self, obj_array=None, value_array=None, hash_func=hash):
 
         self.hash_func = hash_func
-        self.hash_to_idx = {}
-        self.internal_value_array = []
+        self.hash_to_repr_hash = {}                     # Maps from hash value of object->representative hash value of object of region containing both objects
+        self.repr_hash_to_region_start_idx = {}         # Maps from representative hash value->the index of the start of the region which contains it
 
         self.regions = []                               # List of ~sqrt(n) regions of size ~sqrt(n) which contain the values
         self.regions_hash_values = []                   # List of ~sqrt(n) regions of size ~sqrt(n) which contain the hashes corresponding to the indices
         self.region_size = []                           # size of region i
-        self.region_offset = []                         # Offset to apply to each region. If a region has an offset of 1, then every entry in it is considered
-                                                        # to have an index increased by 1. This is to handle insertions at arbitrary positions and allows 
-                                                        # updating up to n indices in O(sqrt(n)) time.
+        self.num_regions = 0                            # Number of total regions
 
         super().__init__(
             obj_array=obj_array,
@@ -58,6 +62,7 @@ class IndexedContainerSqrt(IndexedContainer):
     def _initialize_container(self, obj_array, value_array):
         '''
         Initializes class variables based on input array.
+        O(n)
         '''
         if (obj_array is None) != (value_array is None):
             raise AssertionError(f"Either obj_array and value_array must both not be None, or they must both be None,"
@@ -82,31 +87,75 @@ class IndexedContainerSqrt(IndexedContainer):
         # Construct array containing values
         for i in range(self.length):
 
+            # Check that hash value of object to add doesn't already exist
+            hash_value = self.hash_func(obj_array[i])
+            if hash_value in self.hash_to_repr_hash:
+                # Clear and reset class variables for memory
+                self.length = 0
+                self.num_regions = 0
+                self.regions.clear()
+                self.region_size.clear()
+                self.regions_hash_values.clear()
+                self.hash_to_repr_hash.clear()
+                self.repr_hash_to_region_start_idx.clear()
+                raise AssertionError(f"The hash value of {obj} has already been assigned an index. The initialization has failed.")
+
             # Add a new region every ~sqrt(self.length) elements
             if i % region_length == 0:
                 self.regions.append([])
                 self.regions_hash_values.append([])
                 self.region_size.append(0)
-                self.region_offset.append(0)
-            
-            
-            # Update hash value, check that it doesn't already exist
-            hash_value = self.hash_func(obj_array[i])
-            if hash_value in self.hash_to_idx:
-                # Clear and reset class variables for memory
-                self.length = 0
-                self.regions.clear()
-                self.region_size.clear()
-                self.hash_to_idx.clear()
-                raise AssertionError(f"The hash value of {obj} has already been assigned an index. The initialization has failed.")
+                self.num_regions += 1
+
+                # If first element then the hash is the representative hash
+                self.hash_to_repr_hash[hash_value] = hash_value             # Self mapping
+                self.repr_hash_to_region_start_idx[hash_value] = i          # representative hash to index of start of region
+            else:
+                # Otherwise map hash to representative hash of current region
+                self.hash_to_repr_hash[hash_value] = self.regions_hash_values[-1][0]
 
             # Update region and region size with new element
+            # (can make more effecient by allocating region_length immediately)
             self.regions[-1].append(value_array[i])
             self.regions_hash_values[-1].append(hash_value)
             self.region_size[-1] += 1
+    
+    def reinitialize_container(self):
+        '''
+        Takes the current object and value array mappings and reruns initialization
+        O(n)
+        '''
 
-            # Update hash map value
-            self.hash_to_idx[hash_value] = i
+        # Temporarily store old hash function and make new temp hash func for just numbers
+        hash_func_copy = self.hash_func
+
+        # Set object array to be the raw hash values to preserve mapping when reinitializing
+        self.hash_func = lambda x: x
+        obj_array = [0] * self.length
+        value_array = [None] * self.length
+
+        idx = 0
+        for i in range(self.num_regions):
+            for j in range(self.region_size[i]):
+                obj_array[idx] = self.regions_hash_values[i][j]
+                value_array[idx] = self.regions[i][j]
+                idx += 1
+        
+        # Reset variables, arrays, and dicitonaries before initialization to avoid hashing errors
+        self.length = 0
+        self.num_regions = 0
+        self.regions.clear()
+        self.region_size.clear()
+        self.regions_hash_values.clear()
+        self.hash_to_repr_hash.clear()
+        self.repr_hash_to_region_start_idx.clear()
+        
+        # Reiniatialize container
+        self._initialize_container(obj_array, value_array)
+
+        # Reset hash function
+        self.hash_func = hash_func_copy
+
 
     def access(self, obj):
         '''
@@ -115,34 +164,30 @@ class IndexedContainerSqrt(IndexedContainer):
         :param obj: Obj representing the index
         '''
 
-        # Get if obj has a corresponding index
+        # Get if obj has a corresponding representative hash
         hash_value = self.hash_func(obj)
-        if hash_value not in self.hash_to_idx:
-            raise LookupError(f"Hash value {hash_value} of object {obj} cannot be found in the object to index mapping.")
+        if hash_value not in self.hash_to_repr_hash:
+            raise LookupError(f"Hash value {hash_value} of object {obj} cannot be found in the object to representative object mapping.")
 
         # Get index corresponding to obj, check if it is within bounds
-        idx = self.hash_to_idx[hash_value]
+        repr_hash = self.hash_to_repr_hash[hash_value]
+        idx = self.repr_hash_to_region_start_idx[repr_hash]
         if idx < 0 or idx >= self.length:
             raise AssertionError(f"Attemped to access index {idx} of a collection of size {self.length}.")
         
         # Iterate through regions until in correct region to access
         # Takes O(sqrt(n))
-        cur_idx = 0             # The global index of the first element in the current region(=self.region[cur_region])
-        cur_region_idx = 0
-        while cur_idx + self.region_size[cur_region_idx] <= idx:
-            # Update current index, have to add the size of the current region and the next region's offset
-            cur_idx += self.region_size[cur_region_idx]
-            cur_region_idx += 1
-            cur_idx += self.region_offset[cur_region_idx]       # Moves cur_idx to index of first element
-
-        logger.debug(self.regions)
-        logger.debug(self.region_offset)
-        logger.debug(f"idx: {idx}")
-        logger.debug(cur_region_idx)
-        logger.debug(cur_idx)
-
-        # Return value in region offset by values before it
-        return self.regions[cur_region_idx][idx - cur_idx]
+        for i in range(self.num_regions):
+            # Get if idx is contained within current region
+            region_start_idx = self.repr_hash_to_region_start_idx[self.hash_to_repr_hash[self.regions_hash_values[i][0]]]
+            if idx == region_start_idx:
+                # Iterate over region until hash value found
+                for j in range(self.region_size[i]):
+                    object_hash_value = self.regions_hash_values[i][j]
+                    if object_hash_value == hash_value:
+                        return self.regions[i][j]
+        
+        raise LookupError
     
     def append(self, obj, value):
         '''
@@ -154,9 +199,11 @@ class IndexedContainerSqrt(IndexedContainer):
         '''
         
         # Check for no duplicate hash
-        hash_value = self._check_duplicate_hash(obj=obj)
-        
-        self.hash_to_idx[hash_value] = self.length          # Assign index to hash value of object
+        hash_value = self._check_duplicate_hash(obj)
+
+        # Assign representative hash to representative hash of last region
+        self.hash_to_repr_hash[hash_value] = self.hash_to_repr_hash[self.regions_hash_values[-1][0]]
+
         self.length += 1                                    # Update length
         self.region_size[-1] += 1                           # Update region size of last region
         self.regions[-1].append(value)                      # Add value to last region
@@ -174,41 +221,46 @@ class IndexedContainerSqrt(IndexedContainer):
         
         if idx < 0 or idx > self.length:
             raise AssertionError(f"Cannot insert value at index {idx} in a container of size {self.length}.")
+        
+        # Append if insert is at end
+        if idx == self.length:
+            self.append(obj, value)
 
         # Check for no duplicate hash
-        hash_value = self.hash_func(obj)
-        if hash_value in self.hash_to_idx:
-            raise AssertionError(f"The hash value of {obj} has already been assigned an index. The append operation has failed.")
+        hash_value = self._check_duplicate_hash(obj)
 
         # Iterate through regions until in correct region to insert into
         # Takes O(sqrt(n))
-        cur_idx = 0
-        cur_region_idx = 0
-        while cur_idx + self.region_size[cur_region_idx] <= idx:
-            cur_idx += self.region_size[cur_region_idx]
-            cur_region_idx += 1
+        region_idx = 0
+        while region_idx < self.num_regions:
+            # Get if index to insert at is contained in current region
+            # TODO: remove this next part? representatives are not necessarily the front anymore in this implementation.
+            # Note that we do not insert at the first element of a region
+            # to preserve the representative element being the first element (as a convention)
+            # This is not necessarily needed, but makes it easier to keep track of the representative
+            # object/hash of a region.
+            region_start_idx = self.repr_hash_to_region_start_idx[self.hash_to_repr_hash[self.regions_hash_values[region_idx][0]]]
+            if region_start_idx <= idx and idx < region_start_idx + self.region_size[region_idx]:
+                # If contained, insert at the current region
+                
+                insert_idx = idx - region_start_idx
+
+                # Assign representative hash to newly inserted object/hash
+                self.hash_to_repr_hash[hash_value] = self.hash_to_repr_hash[self.regions_hash_values[region_idx][0]]
+
+                self.length += 1                                                        # Update length
+                self.region_size[region_idx] += 1                                       # Update region size
+                self.regions[region_idx].insert(insert_idx, value)                      # Insert value into region
+                self.regions_hash_values[region_idx].insert(insert_idx, hash_value)     # Insert hash value into region
+                break
+
+            region_idx += 1
         
-        # O(sqrt(n)), each region is O(sqrt(n))
-        insert_idx = idx - cur_idx
-        self.hash_to_idx[hash_value] = idx                                      # Assign index to hash value of object
-        self.length += 1                                                        # Update length
-        self.region_size[cur_region_idx] += 1                                   # Update region size of target region
-        self.regions[cur_region_idx].insert(insert_idx, value)    # Insert value into target region
-        self.regions_hash_values[cur_region_idx].insert(insert_idx, hash_value)   # Insert hash value into backwards mapping
-
-        logger.debug(f"Inserted into {self.regions[cur_region_idx]} at index {insert_idx}")
-
-        # Update hash_value->index mapping for everything inside current region which is after inserted element
-        for i in range(insert_idx + 1, self.region_size[cur_region_idx]):
-            logger.debug(f"Updating hash value->index mapping at index {i}")
-            cur_hash_value = self.regions_hash_values[cur_region_idx][i]
-            self.hash_to_idx[cur_hash_value] += 1
-            logger.debug(f"Update: {self.hash_to_idx[cur_hash_value] - 1} to {self.hash_to_idx[cur_hash_value]}")
-        
-        # For all regions after, apply an offset of +1, all indices there must be considered to be 1 index increased now
-        for i in range(cur_region_idx + 1, len(self.regions)):
-            self.region_offset[i] += 1
-
+        # For all regions after update the startig index to be += 1
+        while region_idx < self.num_regions:
+            repr_hash = self.hash_to_repr_hash[self.regions_hash_values[region_idx][0]]
+            self.repr_hash_to_region_start_idx[repr_hash] += 1
+            region_idx += 1
     
     def _check_duplicate_hash(self, obj):
         '''
@@ -218,7 +270,7 @@ class IndexedContainerSqrt(IndexedContainer):
         '''
 
         hash_val = self.hash_func(obj)
-        if hash_val in self.hash_to_idx:
+        if hash_val in self.hash_to_repr_hash:
             raise AssertionError(f"The hash value of {obj} has already been assigned an index.")
         
         return hash_val
