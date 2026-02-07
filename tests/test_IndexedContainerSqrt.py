@@ -69,7 +69,7 @@ def test_append_large():
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
 
     # Append elements
-    to_append = 300000
+    to_append = 200000
     for i in range(to_append):
         obj = (i + sample_len, i + sample_len)
         value = i

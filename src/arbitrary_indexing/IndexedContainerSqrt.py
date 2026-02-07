@@ -112,8 +112,8 @@ class IndexedContainerSqrt(IndexedContainer):
 
             # Add a new region every ~sqrt(self.length) elements
             if i % region_length == 0:
-                self.regions.append([])
-                self.regions_obj_values.append([])
+                self.regions.append([None] * region_length)
+                self.regions_obj_values.append([None] * region_length)
                 self.region_size.append(0)
                 self.num_regions += 1
 
@@ -125,10 +125,14 @@ class IndexedContainerSqrt(IndexedContainer):
                 self.obj_to_repr_obj[obj] = self.regions_obj_values[-1][0]
 
             # Update region and region size with new element
-            # (can make more effecient by allocating region_length immediately)
-            self.regions[-1].append(value_array[i])
-            self.regions_obj_values[-1].append(obj)
+            self.regions[-1][i % region_length] = value_array[i]
+            self.regions_obj_values[-1][i % region_length] = obj
             self.region_size[-1] += 1
+        
+        # Remove excess None values at the end of both self.regions and self.regions_obj_values
+        if self.region_size[-1] < region_length:
+            self.regions[-1] = self.regions[-1][:self.region_size[-1]]
+            self.regions_obj_values[-1] = self.regions_obj_values[-1][:self.region_size[-1]]
     
     def reinitialize_container(self):
         '''
