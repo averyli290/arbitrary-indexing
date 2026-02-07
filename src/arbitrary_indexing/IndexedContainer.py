@@ -37,3 +37,9 @@ class IndexedContainer:
 
     def insert(self, idx, value):
         raise NotImplementedError("Insert function insert(idx, value) has not been implemented.")
+
+    def extend(self, obj_array, value_array):
+        raise NotImplementedError("Extend function extend(obj_array, value_array) has not been implemented.")
+
+    def get_contiguous_array(self):
+        raise NotImplementedError("Function get_contiguous_array() has not been implemented.")

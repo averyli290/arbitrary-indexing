@@ -50,6 +50,9 @@ class IndexedContainerSqrt(IndexedContainer):
         TODO:
         Work on figuring on what gives the best reinitialization_ratio or if
         there is a better heuristic for when to reinitialize. (repeated in comment below)
+        Setting reinitialize_ratio to be equal to the sqrtval makes the most sense, why?
+        there are sqrtval lists of length sqrtval, if there is one of length sqrtval ^ 2=self.length,
+        then how does worst case search look?
         '''
         self.reinitialize_ratio = 10
 
@@ -89,8 +92,10 @@ class IndexedContainerSqrt(IndexedContainer):
         self.length = len(obj_array)
 
         # Get length of each region
-        region_length = max(1, int(self.length ** (1/2)))
+        region_length = max(10, int(self.length ** (1/2)))
         self.sqrtval = region_length
+        # self.reinitialize_ratio = max(10, max(10, int(self.length ** (7/8)))// region_length)
+        self.reinitialize_ratio = region_length
 
 
         # Construct array containing values
@@ -133,6 +138,24 @@ class IndexedContainerSqrt(IndexedContainer):
         if self.region_size[-1] < region_length:
             self.regions[-1] = self.regions[-1][:self.region_size[-1]]
             self.regions_obj_values[-1] = self.regions_obj_values[-1][:self.region_size[-1]]
+    
+    def get_contiguous_array(self):
+        '''
+        Docstring for get_contiguous_array
+        
+        :param self: Description
+        '''
+        mapping = {}
+        array = [None] * self.length
+        idx = 0
+        for i in range(self.num_regions):
+            for j in range(self.region_size[i]):
+                mapping[self.regions_obj_values[i][j]] = idx
+                array[idx] = self.regions[i][j]
+                idx += 1
+        
+        return array, mapping
+
     
     def reinitialize_container(self):
         '''
@@ -248,6 +271,7 @@ class IndexedContainerSqrt(IndexedContainer):
         # Append if insert is at end
         if idx == self.length:
             self.append(obj, value)
+            return
 
         # Check for no duplicate obj
         self._check_duplicate_obj(obj)

@@ -70,7 +70,7 @@ class IndexedContainerBasic(IndexedContainer):
     
     def append(self, obj, value):
         '''
-        Docstring for append
+        Appends value to the end of the array indexed by obj
         
         :param self: Description
         :param obj: Object to index the value

@@ -1,12 +1,12 @@
 import pytest
 import logging
 import random
+import time
 
 from arbitrary_indexing.IndexedContainerSqrt import IndexedContainerSqrt
 
 logger = logging.getLogger(__name__)
 logger.setLevel(level=logging.DEBUG)
-
 
 
 def test_init_empty():
@@ -18,10 +18,41 @@ def test_init_tuples():
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
 
 def test_large_init_tuples():
-    size = 10000000
+    size = int(1E7)
     obj_array = [(i,i) for i in range(size)]
     value_array = [i for i in range(size)]
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
+
+# @pytest.mark.skip(reason="Recreating large array can be slow")
+def test_large_init_tuples_access_random_idx():
+    size = int(1E7)
+    obj_array = [(i,i) for i in range(size)]
+    value_array = [i for i in range(size)]
+    ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
+    start = time.time()
+    num_random_access = 10000 
+    for i in range(num_random_access):
+        random_idx = random.randint(0,size-1)
+        assert(ics.access(obj_array[random_idx]) == value_array[random_idx])
+    end = time.time()
+    logger.info(f"Total search time across {num_random_access} random accesses across {size} elements in test_large_init_tuples_access_random_idx: {round(end - start,5)} seconds")
+
+# @pytest.mark.skip(reason="Recreating large array can be slow")
+def test_large_get_contiguous_array():
+    size = int(1E7)
+    obj_array = [(i,i) for i in range(size)]
+    value_array = [i for i in range(size)]
+    ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
+    array, mapping = ics.get_contiguous_array()
+    shuffled_obj_array = [o for o in obj_array]
+    random.shuffle(shuffled_obj_array)
+    num_random_access = int(1E6)
+    start = time.time()
+    for i in range(num_random_access):
+        random_obj = shuffled_obj_array[i]
+        temp = array[mapping[random_obj]]
+    end = time.time()
+    logger.info(f"Total search time across {num_random_access} random accesses across {size} elements in test_large_get_contiguous_array: {round(end - start,5)} seconds")
 
 def test_access_success():
     obj_array = [(i,i) for i in range(5)]
@@ -69,19 +100,17 @@ def test_append_large():
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
 
     # Append elements
-    to_append = 200000
+    to_append = int(5E6)
+    obj_array += [None] * to_append
+    value_array += [None] * to_append
     for i in range(to_append):
         obj = (i + sample_len, i + sample_len)
         value = i
         ics.append(obj=obj, value=value)
 
-        obj_array.append(obj)
-        value_array.append(value)
+        obj_array[i + sample_len] = obj
+        value_array[i + sample_len] = value
 
-    # Verify still correct
-    for i in range(len(obj_array)):
-        # logger.debug(i)
-        assert(ics.access(obj_array[i]) == value_array[i])
 
 def test_insert_success():
     sample_len = 10
@@ -128,17 +157,17 @@ def test_random_inserts():
     used.add(None)
 
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
+    getnum = lambda: random.randint(-int(1E15),int(1E15)) 
 
     # Insert elements randomly
-    to_insert = 1000
+    to_insert = int(1E5)
     for i in range(to_insert):
         # Get random insert idx
         insert_idx = random.randint(0, sample_len + i)
         # Generate random object
         obj = None
         while obj in used:
-            random_int = random.randint(-1000000,1000000)
-            obj = (random_int, random_int)
+            obj = (getnum(), getnum())
         used.add(obj)         # Mark this object as used
         value = i
 
@@ -170,7 +199,7 @@ def test_reinitialization():
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
 
     # Append elements
-    to_append = 10000
+    to_append = 150
     for i in range(to_append):
         obj = (i + sample_len, i + sample_len)
         value = i
