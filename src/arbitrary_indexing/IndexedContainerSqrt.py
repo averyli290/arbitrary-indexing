@@ -196,7 +196,10 @@ class IndexedContainerSqrt(IndexedContainer):
     
     def append(self, obj, value):
         '''
-        Docstring for append
+        Appends value to the end of the container indexed by obj.
+
+        Note that append performs poorly for large amounts of data, probably due to
+        dynamic arrays in Python.
         
         :param self: Description
         :param obj: Object to index the value
@@ -267,7 +270,7 @@ class IndexedContainerSqrt(IndexedContainer):
 
             region_idx += 1
 
-        target_region_idx = region_idx      # used to check integrity later
+        target_region_idx = region_idx      # size of this region is used to check integrity later
         if target_region_idx >= self.num_regions:
             raise IndexError(f"Could not insert value {value} at index {idx} represented by object {obj}.")
         

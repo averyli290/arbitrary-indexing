@@ -17,6 +17,12 @@ def test_init_tuples():
     value_array = [i for i in range(5)]
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
 
+def test_large_init_tuples():
+    size = 10000000
+    obj_array = [(i,i) for i in range(size)]
+    value_array = [i for i in range(size)]
+    ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
+
 def test_access_success():
     obj_array = [(i,i) for i in range(5)]
     value_array = [i for i in range(5)]
@@ -54,6 +60,28 @@ def test_append_fail():
         prev_obj = obj_array[0]
         dummy_value = 0
         ics.append(obj=prev_obj, value=dummy_value)
+
+def test_append_large():
+    # Create ICS
+    sample_len = 100
+    obj_array = [(i,i) for i in range(sample_len)]
+    value_array = [i for i in range(sample_len)]
+    ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
+
+    # Append elements
+    to_append = 300000
+    for i in range(to_append):
+        obj = (i + sample_len, i + sample_len)
+        value = i
+        ics.append(obj=obj, value=value)
+
+        obj_array.append(obj)
+        value_array.append(value)
+
+    # Verify still correct
+    for i in range(len(obj_array)):
+        # logger.debug(i)
+        assert(ics.access(obj_array[i]) == value_array[i])
 
 def test_insert_success():
     sample_len = 10
@@ -141,8 +169,8 @@ def test_reinitialization():
     value_array = [i for i in range(sample_len)]
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
 
-    # Append elements (will be inefficient now)
-    to_append = 100000
+    # Append elements
+    to_append = 10000
     for i in range(to_append):
         obj = (i + sample_len, i + sample_len)
         value = i
