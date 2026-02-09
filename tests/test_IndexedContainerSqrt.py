@@ -30,15 +30,17 @@ def test_large_init_tuples_access_random_idx():
     value_array = [i for i in range(size)]
     ics = IndexedContainerSqrt(obj_array=obj_array, value_array=value_array)
     start = time.time()
-    num_random_access = 10000 
+    num_random_access = int(1E5)
     for i in range(num_random_access):
         random_idx = random.randint(0,size-1)
         assert(ics.access(obj_array[random_idx]) == value_array[random_idx])
     end = time.time()
     logger.info(f"Total search time across {num_random_access} random accesses across {size} elements in test_large_init_tuples_access_random_idx: {round(end - start,5)} seconds")
 
-# @pytest.mark.skip(reason="Recreating large array can be slow")
 def test_large_get_contiguous_array():
+    # Converting back to contiguous array performs simiarly well a regular append-based
+    # IndexedContainer like IndexedContainerBasic. That takes ~6 seconds for 1E7 accesses over 1E7
+    # items, this is ~23 seconds for (1E7) / 2 accesses across 1E7 items
     size = int(1E7)
     obj_array = [(i,i) for i in range(size)]
     value_array = [i for i in range(size)]
@@ -46,7 +48,9 @@ def test_large_get_contiguous_array():
     array, mapping = ics.get_contiguous_array()
     shuffled_obj_array = [o for o in obj_array]
     random.shuffle(shuffled_obj_array)
-    num_random_access = int(1E6)
+    num_random_access = int(1E6) // 2
+
+    # why is this so variable? the array is already determined, so it should only be the hash map that is slow
     start = time.time()
     for i in range(num_random_access):
         random_obj = shuffled_obj_array[i]

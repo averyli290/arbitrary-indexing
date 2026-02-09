@@ -10,6 +10,16 @@ def test_init_tuples():
     value_array = [i for i in range(5)]
     icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array)
 
+def test_large_init_tuples():
+    num_elts = int(1E7)
+    obj_array = [(i,i) for i in range(num_elts)]
+    value_array = [i for i in range(num_elts)]
+    icb = IndexedContainerBasic(obj_array=obj_array, value_array=value_array)
+    # Verify still correct
+    for i in range(num_elts):
+        # logger.debug(i)
+        assert(icb.access(obj_array[i]) == value_array[i])
+
 def test_access_success():
     obj_array = [(i,i) for i in range(5)]
     value_array = [i for i in range(5)]
