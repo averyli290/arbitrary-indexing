@@ -56,11 +56,11 @@ class IndexedContainerSqrt(IndexedContainer):
         '''
         self.reinitialize_ratio = 10
 
-        self.obj_to_repr_obj = {}                      # Maps from hash value of object->representative hash value of object of region containing both objects
+        self.obj_to_repr_obj = {}                      # Maps from obj value of object->representative obj value of object of region containing both objects
         self.repr_obj_to_region_start_idx = {}         # Maps from representative hash value->the index of the start of the region which contains it
 
         self.regions = []                               # List of ~sqrt(n) regions of size ~sqrt(n) which contain the values
-        self.regions_obj_values = []                    # List of ~sqrt(n) regions of size ~sqrt(n) which contain the hashes corresponding to the indices
+        self.regions_obj_values = []                    # List of ~sqrt(n) regions of size ~sqrt(n) which contain the objects corresponding to the indices
         self.region_size = []                           # size of region i
         self.num_regions = 0                            # Number of total regions
 
@@ -94,7 +94,6 @@ class IndexedContainerSqrt(IndexedContainer):
         # Get length of each region
         region_length = max(10, int(self.length ** (1/2)))
         self.sqrtval = region_length
-        # self.reinitialize_ratio = max(10, max(10, int(self.length ** (7/8)))// region_length)
         self.reinitialize_ratio = region_length
 
 
@@ -122,11 +121,11 @@ class IndexedContainerSqrt(IndexedContainer):
                 self.region_size.append(0)
                 self.num_regions += 1
 
-                # If first element then the hash is the representative hash
+                # If first element then the obj is the representative obj
                 self.obj_to_repr_obj[obj] = obj # Self mapping
-                self.repr_obj_to_region_start_idx[obj] = i          # representative hash to index of start of region
+                self.repr_obj_to_region_start_idx[obj] = i          # representative obj to index of start of region
             else:
-                # Otherwise map hash to representative hash of current region
+                # Otherwise map hash to representative obj of current region
                 self.obj_to_repr_obj[obj] = self.regions_obj_values[-1][0]
 
             # Update region and region size with new element
@@ -153,6 +152,10 @@ class IndexedContainerSqrt(IndexedContainer):
                 mapping[self.regions_obj_values[i][j]] = idx
                 array[idx] = self.regions[i][j]
                 idx += 1
+
+        # reference Family data structure defined in SageMath
+        # inverted indexing, this might be more useful to return BECAUSE 
+        # we are more concerned about the elements
         
         return array, mapping
 
@@ -163,7 +166,7 @@ class IndexedContainerSqrt(IndexedContainer):
         O(n)
         '''
 
-        # Set object array to be the raw hash values to preserve mapping when reinitializing
+        # Set object array to be the raw obj values to preserve mapping when reinitializing
         obj_array = [0] * self.length
         value_array = [None] * self.length
 
@@ -186,10 +189,10 @@ class IndexedContainerSqrt(IndexedContainer):
         
         # Reiniatialize container
         self._initialize_container(obj_array, value_array)
-
-    def access(self, obj):
+    
+    def index(self, obj):
         '''
-        Returns the value at index represented by object obj.
+        Returns the index represented by object obj.
         
         :param obj: Obj representing the index
         '''
@@ -198,7 +201,7 @@ class IndexedContainerSqrt(IndexedContainer):
         if obj not in self.obj_to_repr_obj:
             raise LookupError(f"Representative object of object {obj} cannot be found.")
 
-        # Get index corresponding to obj, check if it is within bounds
+        # Get index corresponding to repr obj, check if it is within bounds
         repr_obj = self.obj_to_repr_obj[obj]
         idx = self.repr_obj_to_region_start_idx[repr_obj]
         if idx < 0 or idx >= self.length:
@@ -213,13 +216,77 @@ class IndexedContainerSqrt(IndexedContainer):
         for i in range(self.num_regions):
             # Get if idx is contained within current region
             if self.repr_obj_to_region_start_idx[self.obj_to_repr_obj[self.regions_obj_values[i][0]]] == region_start:
-                # Iterate over region until hash value found
-                for j in range(self.region_size[i]):
-                    object_hash_value = self.regions_obj_values[i][j]
-                    if object_hash_value == obj:
-                        return self.regions[i][j]
+                # Return index of matching obj
+                return self.regions_obj_values[i].index(obj)
         
         raise LookupError
+
+    def __getitem__(self, key):
+        '''
+        Returns the value at index represented by object obj.
+        
+        :param obj: Obj representing the index
+        '''
+
+        if isinstance(key, slice):
+            # Get objects from slice
+            start_obj = key.start
+            stop_obj  = key.stop
+
+            # We do NOT support stepped slicing
+            if key.step is not None:
+                raise TypeError("Stepped slicing is not supported for IndexedContainerSqrt.")
+
+            # Convert start and stop objects to internal index
+            start_idx = 0 if start_obj is None else self.index(start_obj)
+            stop_idx = 0 if stop_obj is None else self.index(stop_obj)
+
+            # Collect everything in index range [start_idx, stop_idx)
+            result = []
+
+            idx = start_idx
+            cur_region_idx = 0
+            while idx + self.region_size[cur_region_idx] < stop_idx:
+                result.extend(self.regions[cur_region_idx])
+                idx += self.region_size[cur_region_idx]
+                cur_region_idx += 1
+            
+            if idx < stop_idx:
+                num_remaining_elements = stop_idx - idx
+                result.extend(self.regions[cur_region_idx][:num_remaining_elements])
+                idx += num_remaining_elements
+
+            return result
+
+        else:
+            obj = key
+
+            # Get if obj has a corresponding representative object
+            if obj not in self.obj_to_repr_obj:
+                raise LookupError(f"Representative object of object {obj} cannot be found.")
+
+            # Get index corresponding to repr obj, check if it is within bounds
+            repr_obj = self.obj_to_repr_obj[obj]
+            idx = self.repr_obj_to_region_start_idx[repr_obj]
+            if idx < 0 or idx >= self.length:
+                raise AssertionError(f"Attemped to access index {idx} of a collection of size {self.length}.")
+            
+            # Iterate through regions until in correct region to access
+            # Takes O(sqrt(n))
+            repr_obj = self.obj_to_repr_obj[obj]
+            region_start = self.repr_obj_to_region_start_idx[repr_obj]
+
+            # find region index once
+            for i in range(self.num_regions):
+                # Get if idx is contained within current region
+                if self.repr_obj_to_region_start_idx[self.obj_to_repr_obj[self.regions_obj_values[i][0]]] == region_start:
+                    # Iterate over region until hash value found
+                    for j in range(self.region_size[i]):
+                        object_hash_value = self.regions_obj_values[i][j]
+                        if object_hash_value == obj:
+                            return self.regions[i][j]
+            
+            raise LookupError
     
     def append(self, obj, value):
         '''
@@ -233,16 +300,16 @@ class IndexedContainerSqrt(IndexedContainer):
         :param value: Value to append to array
         '''
         
-        # Check for no duplicate hash
+        # Check for no duplicate obj
         self._check_duplicate_obj(obj)
 
-        # Assign representative hash to representative hash of last region
+        # Assign representative obj to representative obj of last region
         self.obj_to_repr_obj[obj] = self.obj_to_repr_obj[self.regions_obj_values[-1][0]]
 
         self.length += 1                                    # Update length
         self.region_size[-1] += 1                           # Update region size of last region
         self.regions[-1].append(value)                      # Add value to last region
-        self.regions_obj_values[-1].append(obj)            # Add hash value to index->obj mapping by region
+        self.regions_obj_values[-1].append(obj)             # Add obj value to index->obj mapping by region
 
         '''
         Check if integrity has degraded, reinitialize if so.
@@ -287,13 +354,13 @@ class IndexedContainerSqrt(IndexedContainer):
                 
                 insert_idx = idx - region_start_idx
 
-                # Assign representative hash to newly inserted object/hash
+                # Assign representative obj to newly inserted object
                 self.obj_to_repr_obj[obj] = self.obj_to_repr_obj[self.regions_obj_values[region_idx][0]]
 
                 self.length += 1                                                        # Update length
                 self.region_size[region_idx] += 1                                       # Update region size
                 self.regions[region_idx].insert(insert_idx, value)                      # Insert value into region
-                self.regions_obj_values[region_idx].insert(insert_idx, obj)            # Insert hash value into region
+                self.regions_obj_values[region_idx].insert(insert_idx, obj)             # Insert obj value into region
                 break
 
             region_idx += 1
@@ -316,7 +383,7 @@ class IndexedContainerSqrt(IndexedContainer):
     
     def _check_duplicate_obj(self, obj):
         '''
-        Raises AssertionError if obj already exists in self.hash_to_repr_hash, otherwise return nothing.
+        Raises AssertionError if obj already exists in self.obj_to_repr_obj, otherwise return nothing.
         
         :param obj: Object to check duplicate.
         '''

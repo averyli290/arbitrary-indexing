@@ -7,7 +7,6 @@ Currently we can hash an object and map those to indices.
 This implementation does not support removing elements or inserting into the middle
 '''
 
-
 class IndexedContainer:
     def __init__(self, obj_array=None, value_array=None):
         self.value_array = []
@@ -29,7 +28,7 @@ class IndexedContainer:
             return
         raise NotImplementedError("Initialization function _initialize_container has not been implemented for a non-empty array.")
     
-    def access(self, idx):
+    def __getitem__(self, idx):
         raise NotImplementedError("Access function access(idx) has not been implemented.")
 
     def append(self, value):
@@ -43,3 +42,6 @@ class IndexedContainer:
 
     def get_contiguous_array(self):
         raise NotImplementedError("Function get_contiguous_array() has not been implemented.")
+    
+    def __len__(self):
+        return self.length

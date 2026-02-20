@@ -38,7 +38,7 @@ class IndexedContainer:
         self.is_internal = BitVector(size=0)
         self.length = 0
     
-    def access(self, idx):
+    def __getitem__(self, idx):
         if (idx < 0 or idx >= self.length):
             raise AssertionError(f"Attemped to access index {idx} of a collection of size {self.length}.")
 
